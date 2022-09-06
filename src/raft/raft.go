@@ -70,6 +70,9 @@ type Raft struct {
 
 	candidate int32
 	leader int32
+
+	term int
+	voted int
 }
 
 // return currentTerm and whether this server
@@ -142,30 +145,6 @@ func (rf *Raft) Snapshot(index int, snapshot []byte) {
 
 }
 
-
-//
-// example RequestVote RPC arguments structure.
-// field names must start with capital letters!
-//
-type RequestVoteArgs struct {
-	// Your data here (2A, 2B).
-}
-
-//
-// example RequestVote RPC reply structure.
-// field names must start with capital letters!
-//
-type RequestVoteReply struct {
-	// Your data here (2A).
-}
-
-//
-// example RequestVote RPC handler.
-//
-func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
-	// Your code here (2A, 2B).
-}
-
 //
 // example code to send a RequestVote RPC to a server.
 // server is the index of the target server in rf.peers[].
@@ -195,11 +174,6 @@ func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 // that the caller passes the address of the reply struct with &, not
 // the struct itself.
 //
-func (rf *Raft) sendRequestVote(server int, args *RequestVoteArgs, reply *RequestVoteReply) bool {
-	ok := rf.peers[server].Call("Raft.RequestVote", args, reply)
-	return ok
-}
-
 
 //
 // the service using Raft (e.g. a k/v server) wants to start
@@ -264,6 +238,7 @@ func (rf *Raft) ticker() {
 		} else {
 			rf.Debug(dTicker, "Starting election")
 			rf.set_candidate(true)
+			rf.election()
 			rf.reset_election_timeout()
 		}
 

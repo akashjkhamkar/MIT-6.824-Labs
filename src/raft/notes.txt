@@ -3,3 +3,11 @@
     - check for time , if > 300ms -> start election, reset the timer
     - if election already started , stop it and sleep for a random time IMP
     - repeat
+
+2. elections
+    - check if anything has changed before starting election
+    - spawn routines to get the vote
+    - receive votes on receive channel
+    - count the votes , reject old votes coming
+    - if votes == peer n, or majority, quit
+    - setcandidate false, if won leader true
