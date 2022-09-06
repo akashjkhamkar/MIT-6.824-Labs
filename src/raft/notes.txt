@@ -1,0 +1,5 @@
+1. ticker
+    - continuously run / or maybe 10ms sleep
+    - check for time , if > 300ms -> start election, reset the timer
+    - if election already started , stop it and sleep for a random time IMP
+    - repeat

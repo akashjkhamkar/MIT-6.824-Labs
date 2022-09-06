@@ -19,13 +19,13 @@ package raft
 
 import (
 	//	"bytes"
+
 	"sync"
 	"sync/atomic"
 
 	//	"6.824/labgob"
 	"6.824/labrpc"
 )
-
 
 //
 // as each Raft peer becomes aware that successive log entries are
@@ -63,7 +63,13 @@ type Raft struct {
 	// Your data here (2A, 2B, 2C).
 	// Look at the paper's Figure 2 for a description of what
 	// state a Raft server must maintain.
+	election_timeout int
+	last_reset_time int64
+	random_sleep_time_range int
+	base_sleep_time int
 
+	candidate int32
+	leader int32
 }
 
 // return currentTerm and whether this server
@@ -244,12 +250,24 @@ func (rf *Raft) killed() bool {
 // The ticker go routine starts a new election if this peer hasn't received
 // heartsbeats recently.
 func (rf *Raft) ticker() {
-	for rf.killed() == false {
+	for !rf.killed() {
+		rf.random_sleep()
+		
+		rf.mu.Lock()
 
-		// Your code here to check if a leader election should
-		// be started and to randomize sleeping time using
-		// time.Sleep().
+		if !rf.is_election_timeout() || rf.is_leader() {
+			rf.mu.Unlock()
+			continue
+		} else if rf.is_candidate() {
+			rf.Debug(dTicker, "Stopping election and then sleeping for random time")
+			rf.set_candidate(false)
+		} else {
+			rf.Debug(dTicker, "Starting election")
+			rf.set_candidate(true)
+			rf.reset_election_timeout()
+		}
 
+		rf.mu.Unlock()
 	}
 }
 
@@ -272,7 +290,10 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	rf.me = me
 
 	// Your initialization code here (2A, 2B, 2C).
+	rf.random_sleep_time_range = 300
+	rf.base_sleep_time = 300
 
+	rf.election_timeout = rf.get_random_sleeping_time()
 	// initialize from state persisted before a crash
 	rf.readPersist(persister.ReadRaftState())
 
