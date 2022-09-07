@@ -10,12 +10,6 @@ type RequestVoteReply struct {
 	Vote bool
 }
 
-type VoteResult struct {
-	Term int
-	Vote bool
-	Server_term int
-}
-
 func (rf *Raft) RequestVoteHandler(args *RequestVoteArgs, reply *RequestVoteReply) {
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
@@ -54,19 +48,13 @@ func (rf *Raft) sendRequestVote(server int, args *RequestVoteArgs, reply *Reques
 	return ok
 }
 
-func (rf *Raft) request_vote(term int, server int, vote_result chan VoteResult) {
+func (rf *Raft) request_vote(term int, server int, vote_result chan RequestVoteReply) {
 	args := &RequestVoteArgs{
 		Term: term,
 		Server: rf.me,
 	}
 	
 	reply := &RequestVoteReply{}
-
-	result := VoteResult{
-		Term: term,
-		Server_term: -1,
-		Vote: false,
-	}
 
 	for rf.is_candidate() && !rf.killed() {
 		ok := rf.sendRequestVote(server, args, reply)
@@ -75,17 +63,14 @@ func (rf *Raft) request_vote(term int, server int, vote_result chan VoteResult) 
 			continue
 		}
 
-		result.Vote = reply.Vote
-		result.Server_term = reply.Term
-
 		break
 	}
 
-	vote_result <- result
+	vote_result <- *reply
 }
 
 func (rf *Raft) send_vote_requests(term int) {
-	result_ch := make(chan VoteResult, len(rf.peers) - 1)
+	result_ch := make(chan RequestVoteReply, len(rf.peers) - 1)
 	
 	// Spawn the workers to get the votes 
 	for i := 0; i < len(rf.peers); i++ {
@@ -112,8 +97,8 @@ func (rf *Raft) send_vote_requests(term int) {
 			break
 		}
 		
-		if result.Server_term > term {
-			rf.term = result.Server_term
+		if result.Term > term {
+			rf.term = result.Term
 			rf.mu.Unlock()
 			break
 		}
