@@ -54,6 +54,11 @@ func (rf *Raft) set_leader(set bool) {
 	atomic.StoreInt32(&rf.leader, value)
 }
 
+func (rf *Raft) become_follower() {
+	rf.set_leader(false)
+	rf.set_candidate(false)
+}
+
 func (rf *Raft) get_random_sleeping_time() int {
 	random_time := rand.Intn(rf.random_sleep_time_range)
 	total := rf.base_sleep_time + random_time

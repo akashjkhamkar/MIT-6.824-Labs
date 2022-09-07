@@ -7,7 +7,8 @@
 2. elections
     - check if anything has changed before starting election
     - spawn routines to get the vote
-    - receive votes on receive channel
+    - receive votes on receive channel , buffered for n peers
     - count the votes , reject old votes coming
+    - if not candidate , quit
     - if votes == peer n, or majority, quit
     - setcandidate false, if won leader true

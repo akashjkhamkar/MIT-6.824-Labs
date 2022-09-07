@@ -11,6 +11,7 @@ import (
 type logTopic string
 const (
 	dTicker logTopic = "TICK"
+	dElection logTopic = "ELEC"
 )
 
 // Retrieve the verbosity level from an environment variable

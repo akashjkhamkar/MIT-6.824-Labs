@@ -56,6 +56,7 @@ type ApplyMsg struct {
 type Raft struct {
 	mu        sync.Mutex          // Lock to protect shared access to this peer's state
 	peers     []*labrpc.ClientEnd // RPC end points of all peers
+	majority int
 	persister *Persister          // Object to hold this peer's persisted state
 	me        int                 // this peer's index into peers[]
 	dead      int32               // set by Kill()
@@ -78,11 +79,10 @@ type Raft struct {
 // return currentTerm and whether this server
 // believes it is the leader.
 func (rf *Raft) GetState() (int, bool) {
+	rf.mu.Lock()
+	defer rf.mu.Unlock()
 
-	var term int
-	var isleader bool
-	// Your code here (2A).
-	return term, isleader
+	return rf.term, rf.is_leader()
 }
 
 //
@@ -235,6 +235,7 @@ func (rf *Raft) ticker() {
 		} else if rf.is_candidate() {
 			rf.Debug(dTicker, "Stopping election and then sleeping for random time")
 			rf.set_candidate(false)
+			rf.voted = -1
 		} else {
 			rf.Debug(dTicker, "Starting election")
 			rf.set_candidate(true)
@@ -261,8 +262,10 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	persister *Persister, applyCh chan ApplyMsg) *Raft {
 	rf := &Raft{}
 	rf.peers = peers
+	rf.majority = len(peers)/2 + 1
 	rf.persister = persister
 	rf.me = me
+	rf.voted = -1
 
 	// Your initialization code here (2A, 2B, 2C).
 	rf.random_sleep_time_range = 300
