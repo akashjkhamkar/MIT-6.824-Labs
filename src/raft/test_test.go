@@ -22,7 +22,7 @@ import (
 const RaftElectionTimeout = 1000 * time.Millisecond
 
 func TestInitialElection2A(t *testing.T) {
-	servers := 10
+	servers := 3
 	cfg := make_config(t, servers, false, false)
 	defer cfg.cleanup()
 
@@ -64,6 +64,7 @@ func TestReElection2A(t *testing.T) {
 	// if the leader disconnects, a new one should be elected.
 	cfg.disconnect(leader1)
 	cfg.checkOneLeader()
+
 
 	// if the old leader rejoins, that shouldn't
 	// disturb the new leader. and the old leader
