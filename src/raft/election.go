@@ -96,7 +96,7 @@ func (rf *Raft) send_vote_requests(term int) {
 		go rf.request_vote(term, i, result_ch)
 	}
 
-	// receive the votes
+	// Receive the votes
 	votes := 1
 	for i := 0; i < len(rf.peers) - 1; i++ {
 		result := <- result_ch
@@ -122,7 +122,9 @@ func (rf *Raft) send_vote_requests(term int) {
 			// Become leader and end the election
 			rf.Debug(dElection, "Won the election")
 			rf.set_leader(true)
-			// rf.heartsbeats()
+			rf.voted = -1
+			go rf.heartbeats(rf.term)
+			
 			rf.mu.Unlock()
 			return
 		}
@@ -134,8 +136,8 @@ func (rf *Raft) send_vote_requests(term int) {
 }
 
 func (rf *Raft) election() {
-	// get the term
-	// start the main routine
+	// Get the term
+	// Start the main routine
 	
 	rf.term++
 	rf.voted = rf.me

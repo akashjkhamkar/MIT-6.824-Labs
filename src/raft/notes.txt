@@ -12,3 +12,10 @@
     - if not candidate , quit
     - if votes == peer n, or majority, quit
     - setcandidate false, if won leader true
+
+3. heartbeats
+    - store the term first and start heartsbeats
+    - spawn n routines and send heartbeats at 100ms
+    - move to next beat if majority, unless keep on trying
+    - ignore old replies
+    - killing routines if stepping down

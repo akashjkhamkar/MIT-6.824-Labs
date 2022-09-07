@@ -12,6 +12,7 @@ type logTopic string
 const (
 	dTicker logTopic = "TICK"
 	dElection logTopic = "ELEC"
+	dHeartbeat logTopic = "BEAT"
 )
 
 // Retrieve the verbosity level from an environment variable
