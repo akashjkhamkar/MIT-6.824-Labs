@@ -50,6 +50,11 @@ type ApplyMsg struct {
 	SnapshotIndex int
 }
 
+
+type LogEntry struct {
+	Command interface{}
+	Term int
+}
 //
 // A Go object implementing a single Raft peer.
 //
@@ -74,6 +79,14 @@ type Raft struct {
 
 	term int
 	voted int
+
+	commitIndex int
+	lastApplied int
+
+	nextIndex[] int
+	matchIndex[] int
+
+	log[] LogEntry
 }
 
 // return currentTerm and whether this server
@@ -159,12 +172,22 @@ func (rf *Raft) Snapshot(index int, snapshot []byte) {
 // the leader.
 //
 func (rf *Raft) Start(command interface{}) (int, int, bool) {
-	index := -1
-	term := -1
-	isLeader := true
+	rf.mu.Lock()
+	defer rf.mu.Unlock()
 
-	// Your code here (2B).
+	index := len(rf.log)
+	term := rf.term
+	isLeader := rf.is_leader()
 
+	if isLeader {
+		// append the entry
+		entry := LogEntry{
+			Command: command,
+			Term: term,
+		}
+		
+		rf.log = append(rf.log, entry)
+	}
 
 	return index, term, isLeader
 }

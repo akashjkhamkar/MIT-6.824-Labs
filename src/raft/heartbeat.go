@@ -72,6 +72,8 @@ func (rf *Raft) send_beat(term int, server int) {
 
 func (rf *Raft) heartbeats(term int) {
 	// Start heartbeats
+	rf.nextIndex = make([] int, len(rf.peers))
+	rf.matchIndex = make([] int, len(rf.peers))
 
 	for !rf.killed() && rf.is_leader() {
 		// sending beats
