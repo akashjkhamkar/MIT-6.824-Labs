@@ -71,3 +71,11 @@ func (rf *Raft) random_sleep() {
 	total_in_miliseconds := duration * time.Millisecond
 	time.Sleep(total_in_miliseconds)
 }
+
+func max(a , b int) int {
+	if a > b {
+		return a
+	}
+
+	return b
+}

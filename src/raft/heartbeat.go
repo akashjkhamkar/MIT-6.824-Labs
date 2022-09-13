@@ -1,6 +1,8 @@
 package raft
 
-import "time"
+import (
+	"time"
+)
 
 type HeartBeatArgs struct {
 	Term int
@@ -79,8 +81,8 @@ func (rf *Raft) send_beat(term int, server int) {
 		return
 	} else if reply.Success {
 		// update
-		rf.nextIndex[server] = TopIndex
-		rf.matchIndex[server] = TopIndex - 1
+		rf.nextIndex[server] = max(TopIndex, rf.nextIndex[server])
+		rf.matchIndex[server] = max(TopIndex - 1, rf.matchIndex[server])
 	} else {
 		// decrement
 		rf.nextIndex[server]--
