@@ -3,6 +3,8 @@ package raft
 type RequestVoteArgs struct {
 	Term int
 	Server int
+	LastLogIndex int
+	LastLogTerm int
 }
 
 type RequestVoteReply struct {
@@ -16,8 +18,12 @@ func (rf *Raft) RequestVoteHandler(args *RequestVoteArgs, reply *RequestVoteRepl
 
 	reply.Term = rf.term
 
-	if (args.Term < rf.term) || (args.Term == rf.term && rf.is_leader()) {
-		rf.Debug(dTicker, "No vote for S%d because old term (%d).", args.Server, args.Term)
+	candidate_log_size := args.LastLogIndex
+	voter_log_size := len(rf.log)-1
+	is_log_upto_date := candidate_log_size >= voter_log_size
+
+	if args.Term < rf.term || !is_log_upto_date {
+		rf.Debug(dTicker, "No vote for S%d because old term / log (%d).", args.Server, args.Term)
 		reply.Vote = false
 		return
 	}
@@ -29,7 +35,7 @@ func (rf *Raft) RequestVoteHandler(args *RequestVoteArgs, reply *RequestVoteRepl
 		rf.become_follower()
 	}
 
-	if (rf.voted == -1 || rf.voted == args.Server) {
+	if rf.voted == -1 || rf.voted == args.Server {
 		// Grant the vote and convert to follower
 		rf.Debug(dTicker, "Voted to S%d", args.Server)
 		rf.voted = args.Server
@@ -52,6 +58,8 @@ func (rf *Raft) request_vote(term int, server int, vote_result chan RequestVoteR
 	args := &RequestVoteArgs{
 		Term: term,
 		Server: rf.me,
+		LastLogIndex: len(rf.log) - 1,
+		LastLogTerm: rf.log[len(rf.log) - 1].Term,
 	}
 	
 	reply := &RequestVoteReply{}
