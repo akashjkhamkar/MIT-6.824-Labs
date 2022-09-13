@@ -36,25 +36,38 @@ func (rf *Raft) sendRequestBeat(server int, args *HeartBeatArgs, reply *HeartBea
 	return ok
 }
 
-func (rf *Raft) send_beat(term int, server int, result_ch chan HeartBeatReply) {
+func (rf *Raft) send_beat(term int, server int) {
 	args := &HeartBeatArgs{
 		Term: term,
 		Id: rf.me,
 	}
 
 	reply := &HeartBeatReply{}
+	ok := rf.sendRequestBeat(server, args, reply)
 
-	for rf.is_leader() && !rf.killed() {
-		ok := rf.sendRequestBeat(server, args, reply)
+	// if ok
+	// check if term is higher
+	// update the nextindex and matchindex
 
-		if !ok {
-			continue
-		}
-
-		break
+	if !ok {
+		return
 	}
 
-	result_ch <- *reply
+	rf.mu.Lock()
+
+	if !rf.is_leader() {
+		rf.mu.Unlock()
+		return
+	}
+
+	if reply.Term > rf.term {
+		rf.term = reply.Term
+		rf.become_follower()
+	} else {
+		// update the indexes
+	}
+
+	rf.mu.Unlock()
 }
 
 func (rf *Raft) heartbeats(term int) {
@@ -62,48 +75,15 @@ func (rf *Raft) heartbeats(term int) {
 
 	for !rf.killed() && rf.is_leader() {
 		// sending beats
-		result_ch := make(chan HeartBeatReply, len(rf.peers) - 1)
-
 		for i := 0; i < len(rf.peers); i++ {
 			if i == rf.me {
 				continue
 			}
 
-			go rf.send_beat(term, i, result_ch)
+			go rf.send_beat(term, i)
 		}
 
-		success := 1
-		for i := 0; i < len(rf.peers) - 1; i++ {
-			result := <- result_ch
-	
-			if result.Success {
-				success++
-			}
-	
-			rf.mu.Lock()
-	
-			if !rf.is_leader() {
-				rf.mu.Unlock()
-				return
-			}
-			
-			if result.Term > term {
-				rf.term = result.Term
-				rf.become_follower()
-				rf.mu.Unlock()
-				break
-			}
-	
-			if success == rf.majority {
-				// Become leader and end the election
-				rf.Debug(dElection, "Beat completed")
-				rf.mu.Unlock()
-				break
-			}
-	
-			rf.mu.Unlock()
-		}
-
+		rf.Debug(dElection, "Beat completed")
 		time.Sleep(100*time.Millisecond)
 	}
 }

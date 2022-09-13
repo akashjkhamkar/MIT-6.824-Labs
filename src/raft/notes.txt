@@ -19,3 +19,73 @@
     - move to next beat if majority, unless keep on trying
     - ignore old replies
     - killing routines if stepping down
+
+-------------------------------------------------------------------------------
+
+Lab 2: Log replication
+
+* base requirements - 
+    - for each follower, heartbeat will carry entries from nextIndex to current latest entry
+    - follower will reject until leader matches the logs
+    - followers will append the entries onces nextIndex matches, leader will update the nextIndex
+    - once majority appends, commmit the entry and update the commmited number
+    - all the following heartbeats will have that commited number
+    - followers will commmit the entries as described in the paper diagram rules
+
+# fixes required -
+    - heartbeats flaw 1
+    - in current implementation, a failed heartbeat will keep on retrying indefinitely until leader dies
+    - this is problematic as with more heartbeats, more rountines will pile up
+    - a exit channel is required to kill off such beats
+    -
+    - heartbeats flaw 2
+    - no need of retries as we are gonna send a heartbeat every 100ms
+
+$ idempodent - 
+    - heartbeat receiver should behave idempdent way , if thats the right word
+    - even if a heartbeat goes twice , it should handle such case (may happen in case of retries)
+    - also handling the case where old beat reaches after new beat (meaning it will have entry which is already replicated)
+
+! replication status -
+    - why they have told us to keep track of matchIndex ?
+    -> to know till what index entries have been replicated by each server, (so we know till what index majority servers can commit)
+
+    - BUT.. cant we just use nextIndex ?
+    -> yes, but initial value is current log index, so it will mess up the commit index
+
+    its just better to keep these seperate
+
+> plan -
+    - Leader side :=
+    - do all the fixes first
+    - new datastructures for logs, commitIndex, lastCommitIndex, matchIndexes
+    - connecting Start() with logs, 
+    - then connecting logs with heartbeats (delivering logs from nextindex and onwards)
+    - new background processes (leader) 
+        - replication stat -> run every 10 ms, check for the next commitIndex in matchIndex, 
+        update the commitIndex if its greater than lastcommitIndex
+
+        (need to find an algorithm for this)
+        1. bruteforce - for every index after lastcommitIndex, check if accepted by majority
+        
+        and commit the entries from lastcommitIndex to commitIndex (executor)
+
+        (on follower side heartbeathandler can issue executor, no need of background proc there)
+
+    - Follower side :=
+    - Election restrictions
+        - vote if candidate is atleast as upto-date as you
+        - If the logs have last entries with different terms, then the log with the later term is more up-to-date.
+        - If the logs end with the same term, then whichever log is longer is more up-to-date.
+    - HB heartbeathandler
+        - Log matching
+            - outcomes
+                - successful append (if any new entries)
+                - log is behind (then decrement till we reach the point)
+                - log is ahead (then decrement till we reach the point)
+        - connecting executor
+
+1. Start
+    - application layer will send the entry that needs to be replicated
+    - return false if not leader
+    - append the entry into the log
