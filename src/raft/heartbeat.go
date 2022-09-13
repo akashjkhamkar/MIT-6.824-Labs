@@ -5,6 +5,10 @@ import "time"
 type HeartBeatArgs struct {
 	Term int
 	Id int
+	PrevLogIndex int
+	PrevLogTerm int
+	Entries [] LogEntry
+	LeaderCommit int
 }
 
 type HeartBeatReply struct {
@@ -37,42 +41,59 @@ func (rf *Raft) sendRequestBeat(server int, args *HeartBeatArgs, reply *HeartBea
 }
 
 func (rf *Raft) send_beat(term int, server int) {
+	rf.mu.Lock()
+
+	PrevLogIndex := rf.nextIndex[server] - 1
+	PrevLogTerm := rf.log[PrevLogIndex - 1].Term
+	Entries := rf.log[PrevLogIndex+1:]
+
+	TopIndex := len(rf.log)
+
 	args := &HeartBeatArgs{
 		Term: term,
 		Id: rf.me,
+		PrevLogIndex: PrevLogIndex,
+		PrevLogTerm: PrevLogTerm,
+		Entries: Entries,
+		LeaderCommit: rf.commitIndex,
 	}
+
+	rf.mu.Unlock()
 
 	reply := &HeartBeatReply{}
 	ok := rf.sendRequestBeat(server, args, reply)
-
-	// if ok
-	// check if term is higher
-	// update the nextindex and matchindex
 
 	if !ok {
 		return
 	}
 
 	rf.mu.Lock()
+	defer rf.mu.Lock()
 
-	if !rf.is_leader() {
-		rf.mu.Unlock()
+	if !rf.is_leader() || rf.term != term {
 		return
-	}
-
-	if reply.Term > rf.term {
+	} else if reply.Term > rf.term {
 		rf.term = reply.Term
 		rf.become_follower()
+	} else if len(Entries) == 0 {
+		return
+	} else if reply.Success {
+		// update
+		rf.nextIndex[server] = TopIndex
+		rf.matchIndex[server] = TopIndex - 1
 	} else {
-		// update the indexes
+		// decrement
+		rf.nextIndex[server]--
 	}
-
-	rf.mu.Unlock()
 }
 
 func (rf *Raft) heartbeats(term int) {
 	// Start heartbeats
 	rf.nextIndex = make([] int, len(rf.peers))
+	for i := range rf.nextIndex {
+		rf.nextIndex[i] = len(rf.log)
+	}
+
 	rf.matchIndex = make([] int, len(rf.peers))
 
 	for !rf.killed() && rf.is_leader() {
