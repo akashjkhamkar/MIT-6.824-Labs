@@ -47,7 +47,13 @@ func (rf *Raft) ConsistencyCheck(PrevLogIndex, PrevLogTerm int) bool {
 
 	entry := rf.log[PrevLogIndex - 1]
 
-	return entry.Term == PrevLogTerm
+	if entry.Term != PrevLogTerm {
+		// deleting all successesive entries
+		rf.log = rf.log[:PrevLogIndex - 1]
+		return false
+	}
+
+	return true
 }
 
 func (rf *Raft) HeartbeatHandler(args *HeartBeatArgs, reply *HeartBeatReply) {
@@ -127,15 +133,15 @@ func (rf *Raft) send_beat(term int, server int) {
 	} else if reply.Term > rf.term {
 		rf.term = reply.Term
 		rf.become_follower()
-	} else if len(Entries) == 0 {
-		return
 	} else if reply.Success {
 		// update
 		rf.nextIndex[server] = max(TopIndex + 1, rf.nextIndex[server])
 		rf.matchIndex[server] = max(TopIndex, rf.matchIndex[server])
-	} else {
+	} else if !reply.Success {
 		// decrement
 		rf.nextIndex[server]--
+	} else if len(Entries) == 0 {
+		return
 	}
 }
 
@@ -155,7 +161,6 @@ func (rf *Raft) commiter() {
 		})
 
 		rf.commitIndex = sorted_matchindexes[rf.majority - 1]
-		rf.Debug(dHeartbeat, "replication state - ", sorted_matchindexes)
 		rf.executer()
 		rf.mu.Unlock()
 
@@ -175,6 +180,14 @@ func (rf *Raft) heartbeats(term int) {
 
 	for !rf.killed() && rf.is_leader() {
 		// sending beats
+		rf.mu.Lock()
+
+		if term != rf.term {
+			rf.mu.Unlock()
+			break
+		}
+
+		rf.mu.Unlock()
 		for i := 0; i < len(rf.peers); i++ {
 			if i == rf.me {
 				continue
@@ -183,7 +196,7 @@ func (rf *Raft) heartbeats(term int) {
 			go rf.send_beat(term, i)
 		}
 
-		rf.Debug(dElection, "Beat completed")
+		rf.Debug(dHeartbeat, "replication state - ", rf.matchIndex, rf.commitIndex)
 		time.Sleep(100*time.Millisecond)
 	}
 }
