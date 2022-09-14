@@ -19,7 +19,8 @@ func (rf *Raft) RequestVoteHandler(args *RequestVoteArgs, reply *RequestVoteRepl
 	reply.Term = rf.term
 
 	candidate_log_size := args.LastLogIndex
-	voter_log_size := len(rf.log)-1
+	voter_log_size := len(rf.log)
+
 	is_log_upto_date := candidate_log_size >= voter_log_size
 
 	if args.Term < rf.term || !is_log_upto_date {
@@ -55,11 +56,18 @@ func (rf *Raft) sendRequestVote(server int, args *RequestVoteArgs, reply *Reques
 }
 
 func (rf *Raft) request_vote(term int, server int, vote_result chan RequestVoteReply) {
+	LastIndex := len(rf.log)
+	LastTerm := 0
+	
+	if LastIndex != 0 {
+		LastTerm = rf.log[LastIndex - 1].Term
+	}
+
 	args := &RequestVoteArgs{
 		Term: term,
 		Server: rf.me,
-		LastLogIndex: len(rf.log) - 1,
-		LastLogTerm: rf.log[len(rf.log) - 1].Term,
+		LastLogIndex: LastIndex,
+		LastLogTerm: LastTerm,
 	}
 	
 	reply := &RequestVoteReply{}

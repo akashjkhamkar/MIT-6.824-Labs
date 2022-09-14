@@ -18,6 +18,31 @@ type HeartBeatReply struct {
 	Success bool
 }
 
+func (rf *Raft) add_entries(entries [] LogEntry, index int) {
+	entries_len := len(entries)
+	log_len := len(rf.log)
+
+	expected_len := index + entries_len - 1
+
+	if expected_len > log_len {
+		// append
+		rf.log = rf.log[:index]
+		rf.log = append(rf.log, entries...)
+	}
+}
+
+func (rf *Raft) ConsistencyCheck(PrevLogIndex, PrevLogTerm int) bool {
+	if PrevLogIndex == 0 {
+		return true
+	} else if PrevLogIndex > len(rf.log) {
+		return false
+	}
+
+	entry := rf.log[PrevLogIndex - 1]
+
+	return entry.Term == PrevLogTerm
+}
+
 func (rf *Raft) HeartbeatHandler(args *HeartBeatArgs, reply *HeartBeatReply) {
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
@@ -28,13 +53,18 @@ func (rf *Raft) HeartbeatHandler(args *HeartBeatArgs, reply *HeartBeatReply) {
 		reply.Success = false
 		rf.Debug(dHeartbeat, "Rejecting old beat from S%d", args.Id)
 		return
+	} else if !rf.ConsistencyCheck(args.PrevLogIndex, args.PrevLogTerm) {
+		reply.Success = false
+		rf.Debug(dHeartbeat, "Consistency check failed S%d", args.Id)
+	} else {
+		reply.Success = true
+		rf.add_entries(args.Entries, args.PrevLogIndex+1)
 	}
 
 	rf.term = args.Term
 	rf.become_follower()
 	rf.reset_election_timeout()
-	
-	reply.Success = true
+	rf.Debug(dHeartbeat, "Accepted beat from S%d", args.Id)
 }
 
 func (rf *Raft) sendRequestBeat(server int, args *HeartBeatArgs, reply *HeartBeatReply) bool {
@@ -46,8 +76,14 @@ func (rf *Raft) send_beat(term int, server int) {
 	rf.mu.Lock()
 
 	PrevLogIndex := rf.nextIndex[server] - 1
-	PrevLogTerm := rf.log[PrevLogIndex - 1].Term
-	Entries := rf.log[PrevLogIndex+1:]
+	PrevLogTerm := 0
+
+	var Entries [] LogEntry
+
+	if PrevLogIndex != 0 {
+		PrevLogTerm = rf.log[PrevLogIndex - 1].Term
+		Entries = rf.log[PrevLogIndex :]
+	}
 
 	TopIndex := len(rf.log)
 
@@ -63,6 +99,7 @@ func (rf *Raft) send_beat(term int, server int) {
 	rf.mu.Unlock()
 
 	reply := &HeartBeatReply{}
+	
 	ok := rf.sendRequestBeat(server, args, reply)
 
 	if !ok {
@@ -70,7 +107,7 @@ func (rf *Raft) send_beat(term int, server int) {
 	}
 
 	rf.mu.Lock()
-	defer rf.mu.Lock()
+	defer rf.mu.Unlock()
 
 	if !rf.is_leader() || rf.term != term {
 		return
@@ -93,7 +130,7 @@ func (rf *Raft) heartbeats(term int) {
 	// Start heartbeats
 	rf.nextIndex = make([] int, len(rf.peers))
 	for i := range rf.nextIndex {
-		rf.nextIndex[i] = len(rf.log)
+		rf.nextIndex[i] = len(rf.log) + 1
 	}
 
 	rf.matchIndex = make([] int, len(rf.peers))
