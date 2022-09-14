@@ -176,7 +176,7 @@ func (rf *Raft) Start(command interface{}) (int, int, bool) {
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
 
-	index := len(rf.log)
+	index := len(rf.log) + 1
 	term := rf.term
 	isLeader := rf.is_leader()
 
@@ -222,7 +222,7 @@ func (rf *Raft) executer() {
 	for rf.commitIndex >= index {
 		msg := ApplyMsg{
 			CommandValid: true,
-			Command: rf.log[index - 1],
+			Command: rf.log[index - 1].Command,
 			CommandIndex: index,
 		}
 
