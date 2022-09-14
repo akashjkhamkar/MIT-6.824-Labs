@@ -1,6 +1,7 @@
 package raft
 
 import (
+	"sort"
 	"time"
 )
 
@@ -18,6 +19,12 @@ type HeartBeatReply struct {
 	Success bool
 }
 
+func (rf *Raft) set_commit_index(LeaderCommit int) {
+	if LeaderCommit > rf.commitIndex {
+		rf.commitIndex = min(LeaderCommit, len(rf.log))
+	}
+}
+
 func (rf *Raft) add_entries(entries [] LogEntry, index int) {
 	entries_len := len(entries)
 	log_len := len(rf.log)
@@ -26,7 +33,7 @@ func (rf *Raft) add_entries(entries [] LogEntry, index int) {
 
 	if expected_len > log_len {
 		// append
-		rf.log = rf.log[:index]
+		rf.log = rf.log[:index - 1]
 		rf.log = append(rf.log, entries...)
 	}
 }
@@ -48,7 +55,8 @@ func (rf *Raft) HeartbeatHandler(args *HeartBeatArgs, reply *HeartBeatReply) {
 	defer rf.mu.Unlock()
 
 	reply.Term = rf.term
-
+	
+	rf.Debug(dHeartbeat, "Beat - ", args)
 	if args.Term < rf.term {
 		reply.Success = false
 		rf.Debug(dHeartbeat, "Rejecting old beat from S%d", args.Id)
@@ -59,8 +67,10 @@ func (rf *Raft) HeartbeatHandler(args *HeartBeatArgs, reply *HeartBeatReply) {
 	} else {
 		reply.Success = true
 		rf.add_entries(args.Entries, args.PrevLogIndex+1)
+		rf.set_commit_index(args.LeaderCommit)
 	}
 
+	rf.executer()
 	rf.term = args.Term
 	rf.become_follower()
 	rf.reset_election_timeout()
@@ -77,11 +87,14 @@ func (rf *Raft) send_beat(term int, server int) {
 
 	PrevLogIndex := rf.nextIndex[server] - 1
 	PrevLogTerm := 0
+	
+	if PrevLogIndex != 0 {
+		PrevLogTerm = rf.log[PrevLogIndex - 1].Term
+	}
 
 	var Entries [] LogEntry
 
-	if PrevLogIndex != 0 {
-		PrevLogTerm = rf.log[PrevLogIndex - 1].Term
+	if len(rf.log) != 0 {
 		Entries = rf.log[PrevLogIndex :]
 	}
 
@@ -118,11 +131,33 @@ func (rf *Raft) send_beat(term int, server int) {
 		return
 	} else if reply.Success {
 		// update
-		rf.nextIndex[server] = max(TopIndex, rf.nextIndex[server])
-		rf.matchIndex[server] = max(TopIndex - 1, rf.matchIndex[server])
+		rf.nextIndex[server] = max(TopIndex + 1, rf.nextIndex[server])
+		rf.matchIndex[server] = max(TopIndex, rf.matchIndex[server])
 	} else {
 		// decrement
 		rf.nextIndex[server]--
+	}
+}
+
+func (rf *Raft) commiter() {
+	for rf.is_leader() && !rf.killed() {
+		// sort and return the majorith number
+		// making a copy of array because otherwise it will swap server infos
+		rf.mu.Lock()
+
+		var sorted_matchindexes [] int
+		sorted_matchindexes = append(sorted_matchindexes, rf.matchIndex...)
+
+		sort.Slice(sorted_matchindexes, func(i, j int) bool {
+			return sorted_matchindexes[i] > sorted_matchindexes[j]
+		})
+
+		rf.commitIndex = sorted_matchindexes[rf.majority - 1]
+		
+		rf.executer()
+		rf.mu.Unlock()
+
+		time.Sleep(10*time.Millisecond)
 	}
 }
 
@@ -134,9 +169,11 @@ func (rf *Raft) heartbeats(term int) {
 	}
 
 	rf.matchIndex = make([] int, len(rf.peers))
+	go rf.commiter()
 
 	for !rf.killed() && rf.is_leader() {
 		// sending beats
+		rf.Debug(dHeartbeat, "Leader stat : ", rf.matchIndex, rf.nextIndex, rf.commitIndex)
 		for i := 0; i < len(rf.peers); i++ {
 			if i == rf.me {
 				continue

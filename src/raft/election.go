@@ -125,7 +125,7 @@ func (rf *Raft) send_vote_requests(term int) {
 			rf.set_leader(true)
 			rf.voted = -1
 			go rf.heartbeats(rf.term)
-			
+						
 			rf.mu.Unlock()
 			return
 		}

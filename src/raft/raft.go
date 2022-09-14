@@ -87,6 +87,7 @@ type Raft struct {
 	matchIndex[] int
 
 	log[] LogEntry
+	apply_channel chan ApplyMsg
 }
 
 // return currentTerm and whether this server
@@ -187,6 +188,7 @@ func (rf *Raft) Start(command interface{}) (int, int, bool) {
 		}
 		
 		rf.log = append(rf.log, entry)
+		rf.Debug(dMake, "Adding entry : ", command)
 	}
 
 	return index, term, isLeader
@@ -211,6 +213,25 @@ func (rf *Raft) Kill() {
 func (rf *Raft) killed() bool {
 	z := atomic.LoadInt32(&rf.dead)
 	return z == 1
+}
+
+// execute the commands upto the commit point
+func (rf *Raft) executer() {
+	index := rf.lastApplied + 1
+
+	for rf.commitIndex >= index {
+		msg := ApplyMsg{
+			CommandValid: true,
+			Command: rf.log[index - 1],
+			CommandIndex: index,
+		}
+
+		rf.Debug(dExecuter, "Executing cmd : ", rf.log[index - 1])
+		rf.apply_channel <- msg
+		index++
+	}
+
+	rf.lastApplied = rf.commitIndex
 }
 
 // The ticker go routine starts a new election if this peer hasn't received
@@ -257,6 +278,7 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	rf.persister = persister
 	rf.me = me
 	rf.voted = -1
+	rf.apply_channel = applyCh
 
 	// Your initialization code here (2A, 2B, 2C).
 	rf.random_sleep_time_range = 300
@@ -268,7 +290,5 @@ func Make(peers []*labrpc.ClientEnd, me int,
 
 	// start ticker goroutine to start elections
 	go rf.ticker()
-
-
 	return rf
 }
