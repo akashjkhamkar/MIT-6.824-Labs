@@ -474,6 +474,7 @@ func TestRejoin2B(t *testing.T) {
 
 	// leader network failure
 	leader1 := cfg.checkOneLeader()
+	fmt.Println("first failure")
 	cfg.disconnect(leader1)
 
 	// make old leader try to agree on some entries
@@ -483,17 +484,19 @@ func TestRejoin2B(t *testing.T) {
 
 	// new leader commits, also for index=2
 	cfg.one(103, 2, true)
-
 	// new leader network failure
+	fmt.Println("failing second leader")
 	leader2 := cfg.checkOneLeader()
 	cfg.disconnect(leader2)
 
 	// old leader connected again
+	fmt.Println("Reconnceting first leader")
 	cfg.connect(leader1)
 
 	cfg.one(104, 2, true)
 
 	// all together now
+	fmt.Println("Reconnecting second leader")
 	cfg.connect(leader2)
 
 	cfg.one(105, servers, true)

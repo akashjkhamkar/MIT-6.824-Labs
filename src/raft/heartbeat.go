@@ -146,14 +146,16 @@ func (rf *Raft) commiter() {
 		rf.mu.Lock()
 
 		var sorted_matchindexes [] int
+		
 		sorted_matchindexes = append(sorted_matchindexes, rf.matchIndex...)
+		sorted_matchindexes[rf.me] = len(rf.log)
 
 		sort.Slice(sorted_matchindexes, func(i, j int) bool {
 			return sorted_matchindexes[i] > sorted_matchindexes[j]
 		})
 
 		rf.commitIndex = sorted_matchindexes[rf.majority - 1]
-		
+		rf.Debug(dHeartbeat, "replication state - ", sorted_matchindexes)
 		rf.executer()
 		rf.mu.Unlock()
 
@@ -173,7 +175,6 @@ func (rf *Raft) heartbeats(term int) {
 
 	for !rf.killed() && rf.is_leader() {
 		// sending beats
-		rf.Debug(dHeartbeat, "Leader stat : ", rf.matchIndex, rf.nextIndex, rf.commitIndex)
 		for i := 0; i < len(rf.peers); i++ {
 			if i == rf.me {
 				continue
