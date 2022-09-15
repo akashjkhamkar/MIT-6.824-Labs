@@ -26,16 +26,24 @@ func (rf *Raft) set_commit_index(LeaderCommit int) {
 }
 
 func (rf *Raft) add_entries(entries [] LogEntry, index int) {
-	entries_len := len(entries)
-	log_len := len(rf.log)
+	expected_length := index - 1 + len(entries)
+	
+	if expected_length < len(rf.log) {
+		// swap the middle, keep the rest
+		top := rf.log[index - 1 + len(entries):]
+		bottom := rf.log[:index - 1]
 
-	expected_len := index + entries_len - 1
+		var final [] LogEntry
+		final = append(final, bottom...)
+		final = append(final, entries...)
+		final = append(final, top...)
 
-	if expected_len > log_len {
-		// append
-		rf.log = rf.log[:index - 1]
-		rf.log = append(rf.log, entries...)
+		rf.log = final
+		return
 	}
+
+	rf.log = rf.log[:index - 1]
+	rf.log = append(rf.log, entries...)
 }
 
 func (rf *Raft) ConsistencyCheck(PrevLogIndex, PrevLogTerm int) bool {
