@@ -66,6 +66,7 @@ func (rf *Raft) HeartbeatHandler(args *HeartBeatArgs, reply *HeartBeatReply) {
 	if args.Term < rf.term {
 		reply.Success = false
 		rf.Debug(dHeartbeat, "Rejecting old beat from S%d", args.Id)
+		rf.Debug(dHeartbeat, "log : ", rf.log)
 		return
 	} else if !rf.ConsistencyCheck(args.PrevLogIndex, args.PrevLogTerm) {
 		reply.Success = false
@@ -76,6 +77,7 @@ func (rf *Raft) HeartbeatHandler(args *HeartBeatArgs, reply *HeartBeatReply) {
 		rf.set_commit_index(args.LeaderCommit)
 	}
 
+	rf.Debug(dHeartbeat, "log : ", rf.log)
 	rf.executer()
 	rf.term = args.Term
 	rf.become_follower()
@@ -196,6 +198,7 @@ func (rf *Raft) heartbeats(term int) {
 			go rf.send_beat(term, i)
 		}
 
+		rf.Debug(dHeartbeat, "log : ", rf.log)
 		rf.Debug(dHeartbeat, "replication state - ", rf.matchIndex, rf.commitIndex)
 		time.Sleep(100*time.Millisecond)
 	}

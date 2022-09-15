@@ -12,16 +12,33 @@ type RequestVoteReply struct {
 	Vote bool
 }
 
+func (rf *Raft) is_log_upto_date(candidate_last_entry_index, candidate_last_entry_term int) bool {
+	last_index := len(rf.log)
+
+	if last_index == 0 {
+		return true
+	}
+
+	current_last_entry := rf.log[last_index - 1]
+	
+	if current_last_entry.Term > candidate_last_entry_term {
+		return false
+	} else if current_last_entry.Term < candidate_last_entry_term {
+		return true
+	} else if candidate_last_entry_index >= last_index {
+		return true
+	}
+
+	return false
+}
+
 func (rf *Raft) RequestVoteHandler(args *RequestVoteArgs, reply *RequestVoteReply) {
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
 
 	reply.Term = rf.term
 
-	candidate_log_size := args.LastLogIndex
-	voter_log_size := len(rf.log)
-
-	is_log_upto_date := candidate_log_size >= voter_log_size
+	is_log_upto_date := rf.is_log_upto_date(args.LastLogIndex, args.LastLogTerm)
 
 	if args.Term < rf.term || !is_log_upto_date {
 		rf.Debug(dTicker, "No vote for S%d because old term / log (%d).", args.Server, args.Term)
