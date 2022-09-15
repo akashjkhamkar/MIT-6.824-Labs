@@ -17,6 +17,7 @@ type HeartBeatArgs struct {
 type HeartBeatReply struct {
 	Term int
 	Success bool
+	JumpIndex int
 }
 
 func (rf *Raft) set_commit_index(LeaderCommit int) {
@@ -44,6 +45,21 @@ func (rf *Raft) add_entries(entries [] LogEntry, index int) {
 
 	rf.log = rf.log[:index - 1]
 	rf.log = append(rf.log, entries...)
+}
+
+func (rf *Raft) consistency_jump_index(PrevLogIndex int) int {
+	index := min(PrevLogIndex, len(rf.log)) - 1
+	for_term := rf.log[index].Term
+
+	for i := index - 1; i >= 0; i-- {
+		term := rf.log[i].Term
+
+		if term != for_term {
+			return i + 2
+		}
+	}
+
+	return 1
 }
 
 func (rf *Raft) ConsistencyCheck(PrevLogIndex, PrevLogTerm int) bool {
@@ -78,6 +94,7 @@ func (rf *Raft) HeartbeatHandler(args *HeartBeatArgs, reply *HeartBeatReply) {
 		return
 	} else if !rf.ConsistencyCheck(args.PrevLogIndex, args.PrevLogTerm) {
 		reply.Success = false
+		reply.JumpIndex = rf.consistency_jump_index(args.PrevLogIndex)
 		rf.Debug(dHeartbeat, "Consistency check failed S%d", args.Id)
 	} else {
 		reply.Success = true
@@ -143,15 +160,13 @@ func (rf *Raft) send_beat(term int, server int) {
 	} else if reply.Term > rf.term {
 		rf.term = reply.Term
 		rf.become_follower()
-	} else if reply.Success {
+	} else if reply.Success && len(Entries) != 0 {
 		// update
 		rf.nextIndex[server] = max(TopIndex + 1, rf.nextIndex[server])
 		rf.matchIndex[server] = max(TopIndex, rf.matchIndex[server])
 	} else if !reply.Success {
 		// decrement
-		rf.nextIndex[server]--
-	} else if len(Entries) == 0 {
-		return
+		rf.nextIndex[server] = reply.JumpIndex
 	}
 }
 
