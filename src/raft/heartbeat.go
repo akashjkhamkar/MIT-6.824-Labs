@@ -171,26 +171,30 @@ func (rf *Raft) send_beat(term int, server int) {
 }
 
 func (rf *Raft) commiter() {
-	for rf.is_leader() && !rf.killed() {
-		// sort and return the majorith number
-		// making a copy of array because otherwise it will swap server infos
-		rf.mu.Lock()
+	// sort and return the majorith number
+	// making a copy of array because otherwise it will swap server infos
+	var sorted_matchindexes [] int
+	
+	sorted_matchindexes = append(sorted_matchindexes, rf.matchIndex...)
+	sorted_matchindexes[rf.me] = len(rf.log)
 
-		var sorted_matchindexes [] int
-		
-		sorted_matchindexes = append(sorted_matchindexes, rf.matchIndex...)
-		sorted_matchindexes[rf.me] = len(rf.log)
+	sort.Slice(sorted_matchindexes, func(i, j int) bool {
+		return sorted_matchindexes[i] > sorted_matchindexes[j]
+	})
 
-		sort.Slice(sorted_matchindexes, func(i, j int) bool {
-			return sorted_matchindexes[i] > sorted_matchindexes[j]
-		})
+	new_index := sorted_matchindexes[rf.majority - 1]
 
-		rf.commitIndex = sorted_matchindexes[rf.majority - 1]
-		rf.executer()
-		rf.mu.Unlock()
-
-		time.Sleep(10*time.Millisecond)
+	if new_index == 0 || len(rf.log) == 0 {
+		return
 	}
+
+	if rf.log[new_index - 1].Term == rf.term {
+		rf.commitIndex = new_index
+	}
+
+	rf.executer()
+
+	time.Sleep(10*time.Millisecond)
 }
 
 func (rf *Raft) heartbeats(term int) {
@@ -201,7 +205,6 @@ func (rf *Raft) heartbeats(term int) {
 	}
 
 	rf.matchIndex = make([] int, len(rf.peers))
-	go rf.commiter()
 
 	for !rf.killed() && rf.is_leader() {
 		// sending beats
@@ -221,6 +224,7 @@ func (rf *Raft) heartbeats(term int) {
 			go rf.send_beat(term, i)
 		}
 
+		rf.commiter()
 		rf.Debug(dHeartbeat, "log : ", rf.log)
 		rf.Debug(dHeartbeat, "replication state - ", rf.matchIndex, rf.commitIndex)
 		time.Sleep(100*time.Millisecond)
