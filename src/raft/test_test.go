@@ -554,9 +554,9 @@ func TestBackup2B(t *testing.T) {
 
 	time.Sleep(RaftElectionTimeout / 2)
 
-	fmt.Println()
-	fmt.Println("-----------------------------------------------------------------------")
-	fmt.Println()
+	// fmt.Println()
+	// fmt.Println("-----------------------------------------------------------------------")
+	// fmt.Println()
 
 	// bring original leader back to life,
 	for i := 0; i < servers; i++ {

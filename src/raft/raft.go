@@ -238,8 +238,8 @@ func (rf *Raft) executer() {
 // heartsbeats recently.
 func (rf *Raft) ticker() {
 	for !rf.killed() {
-		rf.random_sleep()
-		
+		rf.random_sleep_2(600)
+
 		rf.mu.Lock()
 
 		if !rf.is_election_timeout() || rf.is_leader() {

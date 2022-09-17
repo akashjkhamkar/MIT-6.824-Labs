@@ -72,6 +72,11 @@ func (rf *Raft) random_sleep() {
 	time.Sleep(total_in_miliseconds)
 }
 
+func (rf *Raft) random_sleep_2(between int) {
+	duration := time.Duration(rand.Intn(between))
+	time.Sleep(duration * time.Millisecond)
+}
+
 func max(a , b int) int {
 	if a > b {
 		return a

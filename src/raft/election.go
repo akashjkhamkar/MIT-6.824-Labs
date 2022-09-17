@@ -157,6 +157,11 @@ func (rf *Raft) send_vote_requests(term int) {
 	}
 
 	rf.Debug(dElection, "Lost the election", term)
+
+	rf.mu.Lock()
+	defer rf.mu.Unlock()
+	rf.become_follower()
+	rf.voted = -1
 }
 
 func (rf *Raft) election() {
