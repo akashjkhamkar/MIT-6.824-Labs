@@ -40,8 +40,14 @@ func (rf *Raft) RequestVoteHandler(args *RequestVoteArgs, reply *RequestVoteRepl
 
 	is_log_upto_date := rf.is_log_upto_date(args.LastLogIndex, args.LastLogTerm)
 
-	if args.Term < rf.term || !is_log_upto_date {
-		rf.Debug(dTicker, "No vote for S%d because old term / log (%d).", args.Server, args.Term)
+	if args.Term < rf.term {
+		rf.Debug(dTicker, "No vote for S%d because old term (%d).", args.Server, args.Term)
+		reply.Vote = false
+		return
+	}
+
+	if !is_log_upto_date {
+		rf.Debug(dTicker, "No vote for S%d because outdated log.", args.Server)
 		reply.Vote = false
 		return
 	}
@@ -89,7 +95,7 @@ func (rf *Raft) request_vote(term int, server int, vote_result chan RequestVoteR
 	
 	reply := &RequestVoteReply{}
 
-	for rf.is_candidate() && !rf.killed() {
+	for rf.is_candidate() && !rf.killed() && rf.term == term {
 		ok := rf.sendRequestVote(server, args, reply)
 
 		if !ok {
@@ -125,7 +131,7 @@ func (rf *Raft) send_vote_requests(term int) {
 
 		rf.mu.Lock()
 
-		if !rf.is_candidate() {
+		if !rf.is_candidate() || rf.term != term {
 			rf.mu.Unlock()
 			break
 		}
@@ -150,7 +156,7 @@ func (rf *Raft) send_vote_requests(term int) {
 		rf.mu.Unlock()
 	}
 
-	rf.Debug(dElection, "Lost the election")
+	rf.Debug(dElection, "Lost the election", term)
 }
 
 func (rf *Raft) election() {
