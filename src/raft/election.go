@@ -45,21 +45,18 @@ func (rf *Raft) RequestVoteHandler(args *RequestVoteArgs, reply *RequestVoteRepl
 		reply.Vote = false
 		return
 	}
-
-	if !is_log_upto_date {
-		rf.Debug(dTicker, "No vote for S%d because outdated log.", args.Server)
-		reply.Vote = false
-		return
-	}
-
-	if args.Term > rf.term {
-		rf.Debug(dTicker, "Voting to a higher term candidate S%d", args.Server)
+	
+	if args.Term > rf.term{
 		rf.term = args.Term
-		rf.voted = -1
 		rf.become_follower()
+
+		if is_log_upto_date {
+			rf.Debug(dTicker, "Voting to a higher term candidate S%d", args.Server)
+			rf.voted = -1
+		}
 	}
 
-	if rf.voted == -1 || rf.voted == args.Server {
+	if (rf.voted == -1 || rf.voted == args.Server) && is_log_upto_date {
 		// Grant the vote and convert to follower
 		rf.Debug(dTicker, "Voted to S%d", args.Server)
 		rf.voted = args.Server
@@ -95,7 +92,7 @@ func (rf *Raft) request_vote(term int, server int, vote_result chan RequestVoteR
 	
 	reply := &RequestVoteReply{}
 
-	for rf.is_candidate() && !rf.killed() && rf.term == term {
+	for rf.is_candidate() && !rf.killed() && rf.get_current_term() == term {
 		ok := rf.sendRequestVote(server, args, reply)
 
 		if !ok {

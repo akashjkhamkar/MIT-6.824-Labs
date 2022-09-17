@@ -54,6 +54,13 @@ func (rf *Raft) set_leader(set bool) {
 	atomic.StoreInt32(&rf.leader, value)
 }
 
+func (rf *Raft) get_current_term() int {
+	rf.mu.Lock()
+	defer rf.mu.Unlock()
+
+	return rf.term
+}
+
 func (rf *Raft) become_follower() {
 	rf.set_leader(false)
 	rf.set_candidate(false)

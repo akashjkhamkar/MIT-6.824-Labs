@@ -22,6 +22,7 @@ import (
 
 	"sync"
 	"sync/atomic"
+	"time"
 
 	//	"6.824/labgob"
 	"6.824/labrpc"
@@ -238,7 +239,9 @@ func (rf *Raft) executer() {
 // heartsbeats recently.
 func (rf *Raft) ticker() {
 	for !rf.killed() {
-		rf.random_sleep_2(600)
+		// Sleep atleast for 100ms to avoid excessive locking
+		time.Sleep(100*time.Millisecond)
+		rf.random_sleep_2(100)
 
 		rf.mu.Lock()
 
@@ -249,6 +252,9 @@ func (rf *Raft) ticker() {
 			rf.Debug(dTicker, "Stopping election and then sleeping for random time")
 			rf.set_candidate(false)
 			rf.voted = -1
+			rf.mu.Unlock()
+			rf.random_sleep_2(200)
+			continue
 		} else {
 			rf.Debug(dTicker, "Starting election")
 			rf.set_candidate(true)
@@ -284,7 +290,7 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	rf.random_sleep_time_range = 300
 	rf.base_sleep_time = 300
 
-	rf.election_timeout = rf.get_random_sleeping_time()
+	rf.election_timeout = 300
 	// initialize from state persisted before a crash
 	rf.readPersist(persister.ReadRaftState())
 
